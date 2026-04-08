@@ -1,0 +1,110 @@
+# Video-to-Text Pipeline Configuration
+
+# Frame extraction settings
+frame_extraction:
+  fps: 5.0                    # Sample rate (frames per second)
+  adaptive: false             # Use scene change detection
+  skip_similar: true          # Skip visually similar frames
+  similarity_threshold: 0.95
+
+# Preprocessing settings
+preprocessing:
+  grayscale: true
+  clahe:
+    enabled: true
+    clip_limit: 3.0           # Increased for better contrast on white text
+    tile_grid_size: [8, 8]
+  denoise:
+    enabled: true
+    method: "bilateral"       # Better for text preservation
+    kernel_size: 5
+  upscale:
+    enabled: true
+    factor: 1.5               # 1.5 is sufficient for 1920x1080 video
+  sharpen:
+    enabled: true             # Enable sharpening for text clarity
+    kernel: [[0, -1, 0], [-1, 5, -1], [0, -1, 0]]
+
+# ROI detection settings
+roi:
+  mode: "fixed"               # fixed, adaptive
+  # Normalized coordinates [0, 1] relative to frame dimensions
+  # Adjust these based on your GE UI layout
+  fixed:
+    x: 0.21                   # Left edge - moved right to avoid EF 0/2 area
+    y: 0.02                   # Top edge of instruction box
+    w: 0.28                   # Width - narrower to focus on instruction text only
+    h: 0.30                   # Height - covers instruction lines
+  adaptive:
+    model: "yolov8n"          # For learned ROI detection
+    confidence: 0.5
+
+# Text detection (optional, before OCR)
+text_detection:
+  enabled: false              # Set true for complex UI
+  method: "craft"             # craft, dbnet, east
+  min_confidence: 0.7
+
+# OCR settings
+ocr:
+  engine: "tesseract"         # tesseract (CPU, accurate), easyocr (GPU, fast)
+  lang: "en"
+  min_confidence: 50.0        # 0-100 for tesseract, 0-1 for easyocr
+  # Performance optimization
+  use_gpu: false              # Enable GPU acceleration (requires CUDA for easyocr)
+  single_pass: true           # Use single PSM mode for 3x speedup (slightly lower accuracy)
+  psm_mode: 6                 # Page segmentation mode (6=uniform block, 11=sparse text)
+
+# Text postprocessing
+postprocessing:
+  remove_special_chars: true
+  normalize_whitespace: true
+  lowercase: true
+  spell_check: true           # Enable spell correction
+  spell_correction:
+    enabled: true
+    use_medical_dictionary: true
+  app_vocabulary:
+    enabled: true            # Constrain to APP-specific vocabulary
+    strict_mode: false       # Don't reject words not in vocabulary (too aggressive)
+  # Filter out common OCR artifacts and UI elements
+  blacklist: ["|||", "___", "...", "===", "protocol", "views", "guidance", "short", "shift", "shor", "ss a", "ss", "a a", "- -"]
+
+# Temporal aggregation
+temporal:
+  enabled: true
+  method: "majority_vote"     # majority_vote, confidence_weighted, moving_average
+  window_size: 5              # Number of frames to aggregate
+  min_confidence: 0.6
+  hysteresis:
+    enabled: true
+    threshold: 0.8            # Confidence to switch instruction
+
+# Instruction parsing (text → structured commands)
+instruction_parsing:
+  enabled: true
+  # Keyword mappings for actions
+  actions:
+    rotate: ["rotate", "turn", "twist"]
+    tilt: ["tilt", "angle", "tip"]
+    slide: ["slide", "move", "shift"]
+    press: ["press", "push", "apply pressure"]
+  directions:
+    clockwise: ["clockwise", "cw"]
+    counter_clockwise: ["counter-clockwise", "counterclockwise", "ccw", "anti-clockwise"]
+    left: ["left"]
+    right: ["right"]
+    up: ["up", "upward", "superior"]
+    down: ["down", "downward", "inferior"]
+  speeds:
+    slow: ["slowly", "slow", "gently"]
+    medium: ["medium", "moderate"]
+    fast: ["quickly", "fast", "rapid"]
+  
+# Output settings
+output:
+  format: "json"              # json, yaml, text
+  include_frames: true        # Include per-frame results
+  include_timestamps: true
+  save_debug_images: false
+  debug_output_dir: "debug_output"
