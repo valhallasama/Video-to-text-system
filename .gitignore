@@ -26,8 +26,10 @@ venv/
 ENV/
 
 debug_output/
+snapshots/
 *.jpg
 *.png
+!templates/*.png
 *.mp4
 *.avi
 
